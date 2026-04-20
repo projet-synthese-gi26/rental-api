@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.0.xsd">
+
+    <!-- ================================================================================== -->
+    <!-- 1. MODULE AUTH & MEDIA (Utilisateurs, Audits, Fichiers)                            -->
+    <!-- ================================================================================== -->
+    <changeSet id="01-init-auth-media" author="brayanne">
+        <createTable tableName="users">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="email" type="VARCHAR(255)">
+                <constraints unique="true" nullable="false"/>
+            </column>
+            <column name="password" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="firstname" type="VARCHAR(255)"/>
+            <column name="lastname" type="VARCHAR(255)"/>
+            <column name="fullname" type="VARCHAR(255)"/>
+            <!-- Champs Staff intégrés -->
+            <column name="organization_id" type="UUID"/>
+            <column name="agency_id" type="UUID"/>
+            <column name="poste_id" type="UUID"/>
+            <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE"/>
+            <column name="hired_at" type="TIMESTAMP"/>
+        </createTable>
+
+        <createTable tableName="audits">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="action" type="VARCHAR(255)"/>
+            <column name="module" type="VARCHAR(255)"/>
+            <column name="details" type="TEXT"/>
+            <column name="timestamp" type="TIMESTAMP"/>
+        </createTable>
+
+        <createTable tableName="medias">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="filename" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="original_filename" type="VARCHAR(255)"/>
+            <column name="file_type" type="VARCHAR(50)"/>
+            <column name="file_url" type="VARCHAR(500)"><constraints nullable="false"/></column>
+            <column name="uploader_id" type="UUID"/>
+            <column name="created_at" type="TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ================================================================================== -->
+    <!-- 2. MODULE SUBSCRIPTION & ORGANIZATION                                              -->
+    <!-- ================================================================================== -->
+    <changeSet id="02-init-subscription-org" author="hassana">
+        <createTable tableName="subscription_plans">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(50)"><constraints unique="true" nullable="false"/></column>
+            <column name="description" type="TEXT"/>
+            <column name="price" type="DECIMAL(19,2)"><constraints nullable="false"/></column>
+            <column name="duration_days" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="max_vehicles" type="INTEGER"/>
+            <column name="max_drivers" type="INTEGER"/>
+            <column name="max_agencies" type="INTEGER"/>
+            <column name="max_users" type="INTEGER"/>
+            <column name="has_geofencing" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="has_chat" type="BOOLEAN" defaultValueBoolean="false"/>
+        </createTable>
+
+        <!-- Seed Plans (Idempotent via Preconditions ou SQL insert ignore) -->
+        <sql>
+            INSERT INTO subscription_plans (id, name, description, price, duration_days, max_vehicles, max_drivers, max_agencies, max_users, has_geofencing, has_chat)
+            VALUES
+            (gen_random_uuid(), 'FREE', 'Plan gratuit à vie', 0.00, 0, 5, 5, 1, 2, false, false),
+            (gen_random_uuid(), 'PRO', 'Plan professionnel 30 jours', 10000.00, 30, 50, 50, 10, 30, true, true),
+            (gen_random_uuid(), 'PRO_YEARLY', 'Plan professionnel 1 an', 100000.00, 365, 50, 50, 10, 30, true, true),
+            (gen_random_uuid(), 'ENTERPRISE', 'Accès illimité 30 jours', 30000.00, 30, 999999, 999999, 999999, 999999, true, true),
+            (gen_random_uuid(), 'ENTERPRISE_YEARLY', 'Accès illimité 1 an', 300000.00, 365, 999999, 999999, 999999, 999999, true, true)
+            ON CONFLICT (name) DO NOTHING;
+        </sql>
+
+        <createTable tableName="organizations">
+            <column name="id" type="UUID">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="owner_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_org_owner" referencedTableName="users" referencedColumnNames="id"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="registration_number" type="VARCHAR(100)"/>
+            <column name="tax_number" type="VARCHAR(100)"/>
+            <column name="business_license" type="VARCHAR(500)"/>
+            <column name="address" type="VARCHAR(255)"/>
+            <column name="city" type="VARCHAR(100)"/>
+            <column name="country" type="VARCHAR(50)" defaultValue="CM"/>
+            <column name="postal_code" type="VARCHAR(20)"/>
+            <column name="region" type="VARCHAR(100)"/>
+            <column name="phone" type="VARCHAR(50)"/>
+            <column name="email" type="VARCHAR(255)"/>
+            <column name="website" type="VARCHAR(255)"/>
+            <column name="is_verified" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="verification_date" type="TIMESTAMP"/>
+            <column name="timezone" type="VARCHAR(50)" defaultValue="Africa/Douala"/>
+            <column name="logo_url" type="VARCHAR(500)"/>
+            <column name="is_driver_booking_required" type="BOOLEAN" defaultValueBoolean="false"/>
+
+            <!-- Subscription Link -->
+            <column name="subscription_plan_id" type="UUID">
+                <constraints foreignKeyName="fk_org_sub_plan" referencedTableName="subscription_plans" referencedColumnNames="id"/>
+            </column>
+            <column name="subscription_expires_at" type="TIMESTAMP"/>
+            <column name="subscription_auto_renew" type="BOOLEAN" defaultValueBoolean="true"/>
+
+            <!-- Counters & Stats -->
+            <column name="current_agencies" type="INT" defaultValueNumeric="0"/>
+            <column name="current_vehicles" type="INT" defaultValueNumeric="0"/>
+            <column name="current_drivers" type="INT" defaultValueNumeric="0"/>
+            <column name="current_users" type="INT" defaultValueNumeric="0"/>
+            <column name="total_rentals" type="INT" defaultValueNumeric="0"/>
+            <column name="monthly_revenue" type="DOUBLE" defaultValueNumeric="0.0"/>
+            <column name="yearly_revenue" type="DOUBLE" defaultValueNumeric="0.0"/>
+        </createTable>
+
+        <createTable tableName="subscriptions">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="organization_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_subscription_org" referencedTableName="organizations" referencedColumnNames="id" deleteCascade="true"/>
+            </column>
+            <column name="plan_type" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="start_date" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="end_date" type="TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ================================================================================== -->
+    <!-- 3. MODULE AGENCY & STAFF (Agences, Permissions, Postes)                            -->
+    <!-- ================================================================================== -->
+    <changeSet id="03-init-agency-staff" author="brayan">
+        <createTable tableName="agencies">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="organization_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_agency_org" referencedTableName="organizations" referencedColumnNames="id"/>
+            </column>
+            <column name="name" type="VARCHAR(255)"><constraints nullable="false"/></column>
+            <column name="description" type="TEXT"/>
+            <column name="address" type="VARCHAR(255)"/>
+            <column name="alias_address" type="TEXT"/>
+            <column name="city" type="VARCHAR(100)"/>
+            <column name="country" type="VARCHAR(100)" defaultValue="CM"/>
+            <column name="postal_code" type="VARCHAR(20)"/>
+            <column name="region" type="VARCHAR(100)"/>
+            <column name="latitude" type="DOUBLE PRECISION"/>
+            <column name="longitude" type="DOUBLE PRECISION"/>
+            <column name="geofence_radius" type="DOUBLE PRECISION" defaultValue="500"/>
+            <column name="email" type="VARCHAR(255)"/>
+            <column name="phone" type="VARCHAR(50)"/>
+            <column name="manager_id" type="UUID"/>
+            <column name="is24_hours" type="BOOLEAN" defaultValue="false"/>
+            <column name="timezone" type="VARCHAR(50)" defaultValue="Africa/Douala"/>
+            <column name="currency" type="VARCHAR(10)" defaultValue="XAF"/>
+            <column name="language" type="VARCHAR(10)" defaultValue="fr"/>
+            <column name="working_hours" type="TEXT"/>
+            <column name="allow_online_booking" type="BOOLEAN" defaultValue="true"/>
+            <column name="require_deposit" type="BOOLEAN" defaultValue="true"/>
+            <column name="deposit_percentage" type="DOUBLE PRECISION" defaultValue="30.0"/>
+            <column name="min_rental_hours" type="INTEGER" defaultValue="1"/>
+            <column name="max_advance_booking_days" type="INTEGER" defaultValue="30"/>
+            <column name="logo_url" type="VARCHAR(255)"/>
+            <column name="primary_color" type="VARCHAR(10)" defaultValue="#3b82f6"/>
+            <column name="secondary_color" type="VARCHAR(10)" defaultValue="#1e40af"/>
+            <!-- Stats -->
+            <column name="active_vehicles" type="INTEGER" defaultValue="0"/>
+            <column name="total_vehicles" type="INTEGER" defaultValue="0"/>
+            <column name="active_drivers" type="INTEGER" defaultValue="0"/>
+            <column name="total_drivers" type="INTEGER" defaultValue="0"/>
+            <column name="total_personnel" type="INTEGER" defaultValue="0"/>
+            <column name="total_rentals" type="INTEGER" defaultValue="0"/>
+            <column name="monthly_revenue" type="DOUBLE PRECISION" defaultValue="0.0"/>
+        </createTable>
+
+        <createTable tableName="permissions">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+            <column name="description" type="TEXT"/>
+            <column name="tag" type="VARCHAR(100)"><constraints unique="true" nullable="false"/></column>
+            <column name="module" type="VARCHAR(50)"/>
+        </createTable>
+
+        <createTable tableName="postes">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="organization_id" type="UUID">
+                <constraints foreignKeyName="fk_poste_org" referencedTableName="organizations" referencedColumnNames="id"/>
+            </column>
+            <column name="name" type="VARCHAR(100)"><constraints nullable="false"/></column>
+            <column name="description" type="TEXT"/>
+            <column name="created_at" type="TIMESTAMP"/>
+        </createTable>
+
+        <createTable tableName="postes_permissions">
+            <column name="poste_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_pp_poste" referencedTableName="postes" referencedColumnNames="id" deleteCascade="true"/>
+            </column>
+            <column name="permission_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_pp_perm" referencedTableName="permissions" referencedColumnNames="id" deleteCascade="true"/>
+            </column>
+        </createTable>
+        <addPrimaryKey tableName="postes_permissions" columnNames="poste_id, permission_id" constraintName="pk_postes_permissions"/>
+
+        <!-- Ajout des FK sur la table users pour le staff -->
+        <addForeignKeyConstraint baseTableName="users" baseColumnNames="organization_id" constraintName="fk_user_org" referencedTableName="organizations" referencedColumnNames="id"/>
+        <addForeignKeyConstraint baseTableName="users" baseColumnNames="agency_id" constraintName="fk_user_agency" referencedTableName="agencies" referencedColumnNames="id"/>
+        <addForeignKeyConstraint baseTableName="users" baseColumnNames="poste_id" constraintName="fk_user_poste" referencedTableName="postes" referencedColumnNames="id"/>
+    </changeSet>
+
+    <!-- ================================================================================== -->
+    <!-- 4. SEEDING PERMISSIONS & POSTES (Fichiers SQL externes)                            -->
+    <!-- ================================================================================== -->
+    <changeSet id="04-seed-permissions-postes" author="brayanne">
+        <sqlFile path="seeds/01-permissions.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+        <sqlFile path="seeds/02-default-postes.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+    </changeSet>
+
+    <!-- ================================================================================== -->
+    <!-- 5. MODULE RESOURCES (Véhicules, Catégories, Chauffeurs)                            -->
+    <!-- ================================================================================== -->
+    <changeSet id="05-init-resources" author="hassana">
+        <createTable tableName="vehicle_categories">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="organization_id" type="UUID">
+                <constraints nullable="true" foreignKeyName="fk_cat_org" referencedTableName="organizations" referencedColumnNames="id"/>
+            </column>
+            <column name="name" type="VARCHAR(100)"><constraints nullable="false" unique="true"/></column>
+            <column name="description" type="TEXT"/>
+        </createTable>
+
+        <sqlFile path="seeds/03-categories.sql" relativeToChangelogFile="true" splitStatements="true" stripComments="true"/>
+
+        <createTable tableName="vehicles">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="organization_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_veh_org" referencedTableName="organizations" referencedColumnNames="id"/>
+            </column>
+            <column name="agency_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_veh_agency" referencedTableName="agencies" referencedColumnNames="id"/>
+            </column>
+            <column name="category_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_veh_cat" referencedTableName="vehicle_categories" referencedColumnNames="id"/>
+            </column>
+            <column name="licence_plate" type="VARCHAR(50)"><constraints unique="true" nullable="false"/></column>
+            <column name="vin_number" type="VARCHAR(100)"><constraints unique="true"/></column>
+            <column name="brand" type="VARCHAR(100)"/>
+            <column name="model" type="VARCHAR(100)"/>
+            <column name="year_production" type="TIMESTAMP"/>
+            <column name="places" type="INTEGER"/>
+            <column name="kilometrage" type="DOUBLE PRECISION" defaultValueNumeric="0"/>
+            <column name="color" type="VARCHAR(50)"/>
+            <column name="statut" type="VARCHAR(50)" defaultValue="AVAILABLE"/>
+            <column name="transmission" type="VARCHAR(50)"/>
+            <column name="functionalities" type="jsonb"/>
+            <column name="engine_details" type="jsonb"/>
+            <column name="fuel_efficiency" type="jsonb"/>
+            <column name="insurance_details" type="jsonb"/>
+            <column name="description_list" type="jsonb"/>
+            <column name="images_list" type="jsonb"/>
+            <column name="rating" type="DOUBLE PRECISION" defaultValueNumeric="0.0"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+        </createTable>
+
+        <createTable tableName="drivers">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="organization_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_driver_org" referencedTableName="organizations" referencedColumnNames="id"/>
+            </column>
+            <column name="agency_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_driver_agency" referencedTableName="agencies" referencedColumnNames="id"/>
+            </column>
+            <column name="firstname" type="VARCHAR(100)"><constraints nullable="false"/></column>
+            <column name="lastname" type="VARCHAR(100)"><constraints nullable="false"/></column>
+            <column name="tel" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="age" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="gender" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="profil_url" type="VARCHAR(500)"><constraints nullable="false"/></column>
+            <column name="cni_url" type="VARCHAR(500)"><constraints nullable="false"/></column>
+            <column name="driving_license_url" type="VARCHAR(500)"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(50)" defaultValue="ACTIVE"/>
+            <column name="rating" type="DOUBLE PRECISION" defaultValueNumeric="0.0"/>
+            <column name="created_at" type="TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ================================================================================== -->
+    <!-- 6. MODULE OPERATIONS (Pricing, Schedule, Reviews, Notifications)                   -->
+    <!-- ================================================================================== -->
+    <changeSet id="06-init-operations" author="brayanne">
+        <createTable tableName="pricings">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="organization_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="resource_type" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="resource_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="price_per_hour" type="DECIMAL(19,2)"/>
+            <column name="price_per_day" type="DECIMAL(19,2)"/>
+            <column name="currency" type="VARCHAR(10)" defaultValue="XAF"/>
+            <column name="created_at" type="TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP"/>
+        </createTable>
+        <addUniqueConstraint tableName="pricings" columnNames="resource_type, resource_id" constraintName="uk_pricing_resource"/>
+
+        <createTable tableName="schedules">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="organization_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="resource_type" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="resource_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="start_date" type="TIMESTAMP"><constraints nullable="false"/></column>
+            <column name="end_date" type="TIMESTAMP"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="reason" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP"/>
+        </createTable>
+        <createIndex tableName="schedules" indexName="idx_schedule_resource">
+            <column name="resource_type"/>
+            <column name="resource_id"/>
+            <column name="start_date"/>
+            <column name="end_date"/>
+        </createIndex>
+
+        <createTable tableName="reviews">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="resource_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="resource_type" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="rating" type="INTEGER"><constraints nullable="false"/></column>
+            <column name="comment" type="TEXT"/>
+            <column name="author_name" type="VARCHAR(255)"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+        </createTable>
+        <createIndex tableName="reviews" indexName="idx_reviews_resource">
+            <column name="resource_type"/>
+            <column name="resource_id"/>
+        </createIndex>
+
+        <createTable tableName="notifications">
+            <column name="id" type="UUID" defaultValueComputed="gen_random_uuid()"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="location_id" type="UUID"/>
+            <column name="resource_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="resource_type" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="reason" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="vehicle_id" type="UUID"/>
+            <column name="driver_id" type="UUID"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"><constraints nullable="false"/></column>
+            <column name="is_read" type="BOOLEAN" defaultValueBoolean="false"><constraints nullable="false"/></column>
+            <column name="details" type="TEXT"/>
+        </createTable>
+        <createIndex tableName="notifications" indexName="idx_notifications_resource_id">
+            <column name="resource_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ================================================================================== -->
+    <!-- 7. MODULE RENTALS & PAYMENTS (Locations, Transactions)                             -->
+    <!-- ================================================================================== -->
+    <changeSet id="07-init-rentals" author="brayanne">
+        <createTable tableName="rentals">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="client_id" type="UUID"/> <!-- Nullable pour Walk-in -->
+            <column name="client_name" type="VARCHAR(255)"/> <!-- Pour Walk-in -->
+            <column name="agency_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="vehicle_id" type="UUID"><constraints nullable="false"/></column>
+            <column name="driver_id" type="UUID"/>
+            <column name="start_date" type="TIMESTAMP"><constraints nullable="false"/></column>
+            <column name="end_date" type="TIMESTAMP"><constraints nullable="false"/></column>
+            <column name="status" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="rental_type" type="VARCHAR(20)"><constraints nullable="false"/></column>
+            <column name="total_amount" type="DECIMAL(19,2)"/>
+            <column name="amount_paid" type="DECIMAL(19,2)" defaultValueNumeric="0"/>
+            <column name="commission_amount" type="DECIMAL(19,2)"/>
+            <column name="deposit_amount" type="DECIMAL(19,2)"/>
+            <column name="client_phone" type="VARCHAR(50)"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+            <column name="updated_at" type="TIMESTAMP"/>
+        </createTable>
+        <createIndex tableName="rentals" indexName="idx_rentals_agency"><column name="agency_id"/></createIndex>
+        <createIndex tableName="rentals" indexName="idx_rentals_client"><column name="client_id"/></createIndex>
+
+        <createTable tableName="payments">
+            <column name="id" type="UUID"><constraints primaryKey="true" nullable="false"/></column>
+            <column name="rental_id" type="UUID">
+                <constraints nullable="false" foreignKeyName="fk_payment_rental" referencedTableName="rentals" referencedColumnNames="id"/>
+            </column>
+            <column name="amount" type="DECIMAL(19,2)"><constraints nullable="false"/></column>
+            <column name="payment_method" type="VARCHAR(50)"><constraints nullable="false"/></column>
+            <column name="transaction_date" type="TIMESTAMP" defaultValueComputed="NOW()"/>
+            <column name="transaction_ref" type="VARCHAR(100)"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ================================================================================== -->
+    <!-- 8. AJOUT DES CHAMPS CLIENT POUR WALK-IN DANS RENTALS                               -->
+    <!-- ================================================================================== -->
+    <changeSet id="08-add-client-details-to-rentals" author="brayanne">
+        <addColumn tableName="rentals">
+            <column name="client_email" type="VARCHAR(255)"/>
+            <column name="cni_number" type="VARCHAR(100)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>
