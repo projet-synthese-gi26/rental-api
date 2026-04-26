@@ -16,7 +16,7 @@ RUN mvn clean package -DskipTests
 # ==========================================
 # Stage 2 : Runtime (Image légère)
 # ==========================================
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-jammy
 
 # Installation de curl pour d'éventuels tests (optionnel)
 RUN apk add --no-cache curl tzdata
