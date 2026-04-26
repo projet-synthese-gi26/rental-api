@@ -18,9 +18,6 @@ RUN mvn clean package -DskipTests
 # ==========================================
 FROM eclipse-temurin:21-jre-jammy
 
-# Installation de curl pour d'éventuels tests (optionnel)
-RUN apk add --no-cache curl tzdata
-
 # Configuration de la Timezone (Cameroun)
 ENV TZ=Africa/Douala
 
