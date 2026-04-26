@@ -22,7 +22,7 @@ public class SecurityConfig {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/auth/**", "/swagger-ui.html", "/webjars/**", "/v3/api-docs/**").permitAll()
+                        .pathMatchers("/auth/**", "/swagger-ui.html", "/webjars/**", "/v3/api-docs/**", "/actuator/**").permitAll()
                         .pathMatchers(HttpMethod.PUT, "/api/subscriptions/plans/**").hasRole("ADMIN")
                         // Endpoints publics
                         .pathMatchers(
