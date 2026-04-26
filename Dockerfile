@@ -21,9 +21,7 @@ FROM eclipse-temurin:21-jre-jammy
 # Configuration de la Timezone (Cameroun)
 ENV TZ=Africa/Douala
 
-# Création d'un utilisateur non-root pour la sécurité
-RUN addgroup -g 1001 -S rentalgroup && \
-    adduser -u 1001 -S rentaluser -G rentalgroup
+RUN addgroup yowyob && adduser yowyob --ingroup yowyob
 
 WORKDIR /app
 
@@ -33,10 +31,10 @@ COPY --from=build /app/target/apirental-*.jar app.jar
 
 # Création du dossier uploads avec les bonnes permissions
 RUN mkdir -p /app/uploads && \
-    chown -R rentaluser:rentalgroup /app
+    chown -R yowyob:yowyob /app
 
 # Passage à l'utilisateur non-root
-USER rentaluser
+USER yowyob:yowyob
 
 # Exposition du port (Spring Boot par défaut est 8080)
 EXPOSE 8080
